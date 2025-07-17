@@ -5,6 +5,7 @@ import NumericalInfo from '@/components/Dashboard/NumericalInfo';
 import Credentials from '@/components/Dashboard/Credentials';
 import RecentSchedules from '@/components/Dashboard/RecentSchedules';
 import Head from 'next/head';
+import Link from 'next/link';
 
 export default function Dashboard() {
   const { data: contacts } = useQuery({
@@ -75,31 +76,34 @@ export default function Dashboard() {
           
           {/* Stats */}
           <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {stats.map((stat) => (
-              <div
-                key={stat.name}
-                className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => window.location.href = stat.href}
-              >
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className={`flex-shrink-0 ${stat.bgColor} rounded-md p-3`}>
-                      <stat.icon className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">
-                          {stat.name}
-                        </dt>
-                        <dd className="text-lg font-semibold text-gray-900">
-                          {stat.value}
-                        </dd>
-                      </dl>
+            {stats.map((stat) => {
+              const StatIcon = stat.icon;
+              return (
+                <Link
+                  key={stat.name}
+                  href={stat.href}
+                  className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer block"
+                >
+                  <div className="p-5">
+                    <div className="flex items-center">
+                      <div className={`flex-shrink-0 ${stat.bgColor} rounded-md p-3`}>
+                        <StatIcon className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="ml-5 w-0 flex-1">
+                        <dl>
+                          <dt className="text-sm font-medium text-gray-500 truncate">
+                            {stat.name}
+                          </dt>
+                          <dd className="text-lg font-semibold text-gray-900">
+                            {stat.value}
+                          </dd>
+                        </dl>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            ))}
+                </Link>
+              );
+            })}
           </div>
 
           {/* Main content grid */}

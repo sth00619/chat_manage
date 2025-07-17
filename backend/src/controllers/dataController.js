@@ -211,14 +211,33 @@ class DataController {
     }
   }
 
+  async createSchedule(req, res) {
+    try {
+      // 클라이언트에서 받은 시간을 그대로 사용
+      const scheduleData = {
+        ...req.body,
+        user_id: req.user.id,
+        // ISO 문자열을 Date 객체로 변환하지 않고 그대로 저장
+        start_time: req.body.start_time,
+        end_time: req.body.end_time
+      };
+
+      const schedule = await Schedule.create(scheduleData);
+      res.json(schedule);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
   async getSchedules(req, res) {
     try {
       const { start, end } = req.query;
       const where = { user_id: req.user.id };
       
       if (start && end) {
+        // UTC 시간으로 변환하지 않고 그대로 사용
         where.start_time = {
-          [Op.between]: [new Date(start), new Date(end)]
+          [Op.between]: [start, end]
         };
       }
 
@@ -226,19 +245,18 @@ class DataController {
         where,
         order: [['start_time', 'ASC']]
       });
-      res.json(schedules);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  }
-
-  async createSchedule(req, res) {
-    try {
-      const schedule = await Schedule.create({
-        ...req.body,
-        user_id: req.user.id
+      
+      // 응답 전에 시간을 한국 시간으로 표시
+      const schedulesWithKST = schedules.map(schedule => {
+        const data = schedule.toJSON();
+        return {
+          ...data,
+          start_time_kst: new Date(data.start_time).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+          end_time_kst: data.end_time ? new Date(data.end_time).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : null
+        };
       });
-      res.json(schedule);
+      
+      res.json(schedules);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

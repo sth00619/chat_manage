@@ -16,20 +16,28 @@ import {
   PieChart,
   Pie,
   Cell,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  AreaChart,
+  Area,
 } from 'recharts';
 import {
   UsersIcon,
   ChartBarIcon,
   CircleStackIcon,
   CpuChipIcon,
-  MagnifyingGlassIcon,
+  ClockIcon,
+  ArrowTrendingUpIcon,
+  ServerIcon,
 } from '@heroicons/react/24/outline';
 import UserManagement from '@/components/Admin/UserManagement';
 
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6'];
 
 export default function Admin() {
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedTab, setSelectedTab] = useState('overview');
 
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -62,6 +70,7 @@ export default function Admin() {
 
   const tabs = [
     { id: 'overview', name: '개요' },
+    { id: 'analytics', name: '분석' },
     { id: 'users', name: '사용자 관리' },
   ];
 
@@ -96,7 +105,7 @@ export default function Admin() {
             </nav>
           </div>
 
-          {selectedTab === 'overview' ? (
+          {selectedTab === 'overview' && (
             <>
               {/* Stats Grid */}
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
@@ -261,7 +270,7 @@ export default function Admin() {
 
               {/* Activity by Type */}
               {stats?.data?.activityByType && stats.data.activityByType.length > 0 && (
-                <div className="bg-white p-6 rounded-lg shadow">
+                <div className="bg-white p-6 rounded-lg shadow mb-6">
                   <h2 className="text-lg font-medium mb-4">활동 유형별 통계 (최근 7일)</h2>
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={stats.data.activityByType}>
@@ -275,8 +284,93 @@ export default function Admin() {
                 </div>
               )}
             </>
-          ) : (
-            <UserManagement searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
+          )}
+
+          {selectedTab === 'analytics' && (
+            <>
+              {/* Advanced Analytics */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Hourly Usage Pattern */}
+                <div className="bg-white p-6 rounded-lg shadow">
+                  <h2 className="text-lg font-medium mb-4">시간대별 사용 패턴</h2>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={stats?.data?.hourlyPattern || []}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="hour" tickFormatter={(hour) => `${hour}시`} />
+                      <YAxis />
+                      <Tooltip />
+                      <Area type="monotone" dataKey="action_count" stroke="#8B5CF6" fill="#8B5CF6" fillOpacity={0.6} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Top Active Users */}
+                <div className="bg-white p-6 rounded-lg shadow">
+                  <h2 className="text-lg font-medium mb-4">가장 활발한 사용자 TOP 10</h2>
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {stats?.data?.topActiveUsers?.map((user, index) => (
+                      <div key={user.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                        <div className="flex items-center">
+                          <span className="text-sm font-medium text-gray-600 w-8">{index + 1}</span>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-gray-900">{user.name || user.email}</p>
+                            <p className="text-xs text-gray-500">{user.email}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-gray-900">{user.action_count} 활동</p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(user.last_activity).toLocaleDateString('ko-KR')}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Feature Usage */}
+                <div className="bg-white p-6 rounded-lg shadow">
+                  <h2 className="text-lg font-medium mb-4">기능별 사용 통계</h2>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RadarChart data={stats?.data?.featureUsage || []}>
+                      <PolarGrid />
+                      <PolarAngleAxis dataKey="feature" />
+                      <PolarRadiusAxis />
+                      <Radar name="사용 횟수" dataKey="usage_count" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.6} />
+                      <Tooltip />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Storage Top Users */}
+                <div className="bg-white p-6 rounded-lg shadow">
+                  <h2 className="text-lg font-medium mb-4">저장 용량 상위 사용자</h2>
+                  <div className="space-y-2">
+                    {stats?.data?.topStorageUsers?.map((user) => (
+                      <div key={user.id} className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{user.name || user.email}</p>
+                          <p className="text-xs text-gray-500">{user.file_count} 파일</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-gray-900">{user.total_size_mb} MB</p>
+                          <div className="w-32 bg-gray-200 rounded-full h-2 mt-1">
+                            <div 
+                              className="bg-blue-600 h-2 rounded-full" 
+                              style={{ width: `${Math.min((user.total_size_mb / 100) * 100, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {selectedTab === 'users' && (
+            <UserManagement />
           )}
         </div>
       </div>

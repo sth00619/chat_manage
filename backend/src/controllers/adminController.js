@@ -1,99 +1,68 @@
 const User = require('../models/User');
-const Contact = require('../models/Contact');
-const Credential = require('../models/Credential');
-const Goal = require('../models/Goal');
-const Schedule = require('../models/Schedule');
-const NumericalInfo = require('../models/NumericalInfo');
-const Album = require('../models/Album');
-const UsageStat = require('../models/UsageStat');
 const sequelize = require('../config/database');
-const { Op } = require('sequelize');
+const { QueryTypes } = require('sequelize');
 
 class AdminController {
   async getDashboardStats(req, res) {
     try {
-      // Total users
-      const totalUsers = await User.count();
-
-      // Active users (logged in within last 24 hours)
-      const activeUsers = await sequelize.query(
-        `SELECT COUNT(DISTINCT user_id) as count 
-         FROM usage_stats 
-         WHERE created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)`,
-        { type: sequelize.QueryTypes.SELECT }
-      );
-
-      // New users (last 30 days)
-      const newUsers = await User.count({
-        where: {
-          created_at: {
-            [Op.gte]: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-          }
-        }
+      // 대시보드 메인 통계 프로시저 호출
+      const mainStats = await sequelize.query('CALL sp_get_dashboard_stats()', {
+        type: QueryTypes.RAW
       });
 
-      // Usage stats for the last 30 days
-      const usageStats = await sequelize.query(
-        `SELECT 
-          DATE(created_at) as date,
-          COUNT(*) as total_actions,
-          COUNT(DISTINCT user_id) as unique_users
-         FROM usage_stats 
-         WHERE created_at > DATE_SUB(NOW(), INTERVAL 30 DAY)
-         GROUP BY DATE(created_at)
-         ORDER BY date DESC`,
-        { type: sequelize.QueryTypes.SELECT }
-      );
-
-      // Storage stats
-      const storageStats = await Promise.all([
-        Contact.count(),
-        Credential.count(),
-        Goal.count(),
-        Schedule.count(),
-        NumericalInfo.count(),
-        Album.count(),
-        Album.sum('size')
-      ]);
-
-      const [
-        totalContacts,
-        totalCredentials,
-        totalGoals,
-        totalSchedules,
-        totalNumericalInfo,
-        totalAlbums,
-        totalStorageBytes
-      ] = storageStats;
-
-      // Activity by type (last 7 days)
-      const activityByType = await sequelize.query(
-        `SELECT 
-          action_type,
-          COUNT(*) as count
-         FROM usage_stats 
-         WHERE created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
-         GROUP BY action_type
-         ORDER BY count DESC`,
-        { type: sequelize.QueryTypes.SELECT }
-      );
-
-      res.json({
-        totalUsers,
-        activeUsers: activeUsers[0].count,
-        newUsers,
-        usageStats,
-        storageStats: {
-          total_contacts: totalContacts,
-          total_credentials: totalCredentials,
-          total_goals: totalGoals,
-          total_schedules: totalSchedules,
-          total_numerical_info: totalNumericalInfo,
-          total_albums: totalAlbums,
-          total_storage_bytes: totalStorageBytes || 0
-        },
-        activityByType
+      // 사용량 추이 (30일)
+      const usageStats = await sequelize.query('CALL sp_get_usage_trend(?)', {
+        replacements: [30],
+        type: QueryTypes.RAW
       });
+
+      // 활동 유형별 통계 (7일)
+      const activityByType = await sequelize.query('CALL sp_get_activity_by_type(?)', {
+        replacements: [7],
+        type: QueryTypes.RAW
+      });
+
+      // 시간대별 사용 패턴
+      const hourlyPattern = await sequelize.query('CALL sp_get_hourly_usage_pattern()', {
+        type: QueryTypes.RAW
+      });
+
+      // 가장 활발한 사용자
+      const topActiveUsers = await sequelize.query('CALL sp_get_top_active_users()', {
+        type: QueryTypes.RAW
+      });
+
+      // 데이터 증가 추이
+      const dataGrowth = await sequelize.query('CALL sp_get_data_growth_trend()', {
+        type: QueryTypes.RAW
+      });
+
+      // 저장 용량 상위 사용자
+      const topStorageUsers = await sequelize.query('CALL sp_get_top_storage_users()', {
+        type: QueryTypes.RAW
+      });
+
+      // 기능별 사용 통계
+      const featureUsage = await sequelize.query('CALL sp_get_feature_usage_stats()', {
+        type: QueryTypes.RAW
+      });
+
+      // MySQL 프로시저 결과 파싱
+      const stats = {
+        totalUsers: mainStats[0][0].total_users,
+        activeUsers: mainStats[1][0].active_users_24h,
+        newUsers: mainStats[2][0].new_users_30d,
+        storageStats: mainStats[3][0],
+        usageStats: usageStats[0],
+        activityByType: activityByType[0],
+        hourlyPattern: hourlyPattern[0],
+        topActiveUsers: topActiveUsers[0],
+        dataGrowth: dataGrowth[0],
+        topStorageUsers: topStorageUsers[0],
+        featureUsage: featureUsage[0]
+      };
+
+      res.json(stats);
     } catch (error) {
       console.error('Admin dashboard error:', error);
       res.status(500).json({ error: error.message });
@@ -103,54 +72,21 @@ class AdminController {
   async getUsers(req, res) {
     try {
       const { page = 1, limit = 20, search = '' } = req.query;
-      const offset = (page - 1) * limit;
 
-      const where = search ? {
-        [Op.or]: [
-          { email: { [Op.like]: `%${search}%` } },
-          { name: { [Op.like]: `%${search}%` } }
-        ]
-      } : {};
-
-      const { count, rows: users } = await User.findAndCountAll({
-        where,
-        attributes: ['id', 'email', 'name', 'provider', 'is_admin', 'created_at'],
-        order: [['created_at', 'DESC']],
-        limit: parseInt(limit),
-        offset: parseInt(offset)
+      // 사용자 목록 프로시저 호출
+      const result = await sequelize.query('CALL sp_get_users_list(?, ?, ?)', {
+        replacements: [search, parseInt(page), parseInt(limit)],
+        type: QueryTypes.RAW
       });
 
-      // Get usage stats for each user
-      const userIds = users.map(u => u.id);
-      const userStats = await sequelize.query(
-        `SELECT 
-          user_id,
-          COUNT(*) as total_actions,
-          MAX(created_at) as last_activity
-         FROM usage_stats 
-         WHERE user_id IN (:userIds)
-         GROUP BY user_id`,
-        { 
-          replacements: { userIds },
-          type: sequelize.QueryTypes.SELECT 
-        }
-      );
-
-      const statsMap = userStats.reduce((acc, stat) => {
-        acc[stat.user_id] = stat;
-        return acc;
-      }, {});
-
-      const usersWithStats = users.map(user => ({
-        ...user.toJSON(),
-        stats: statsMap[user.id] || { total_actions: 0, last_activity: null }
-      }));
+      const totalCount = result[0][0].total_count;
+      const users = result[1];
 
       res.json({
-        users: usersWithStats,
-        total: count,
+        users,
+        total: totalCount,
         page: parseInt(page),
-        totalPages: Math.ceil(count / limit)
+        totalPages: Math.ceil(totalCount / limit)
       });
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -161,58 +97,29 @@ class AdminController {
     try {
       const { id } = req.params;
       
-      const user = await User.findByPk(id, {
-        attributes: ['id', 'email', 'name', 'provider', 'is_admin', 'created_at']
+      // 사용자 상세 정보 프로시저 호출
+      const result = await sequelize.query('CALL sp_get_user_details(?)', {
+        replacements: [id],
+        type: QueryTypes.RAW
       });
 
-      if (!user) {
+      if (!result[0] || result[0].length === 0) {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      // Get user's data counts
-      const [
-        contactsCount,
-        credentialsCount,
-        goalsCount,
-        schedulesCount,
-        numericalInfoCount,
-        albumsCount,
-        totalStorage
-      ] = await Promise.all([
-        Contact.count({ where: { user_id: id } }),
-        Credential.count({ where: { user_id: id } }),
-        Goal.count({ where: { user_id: id } }),
-        Schedule.count({ where: { user_id: id } }),
-        NumericalInfo.count({ where: { user_id: id } }),
-        Album.count({ where: { user_id: id } }),
-        Album.sum('size', { where: { user_id: id } })
-      ]);
+      const userDetails = {
+        user: result[0][0],
+        dataStats: result[1][0],
+        recentActivity: result[2]
+      };
 
-      // Get recent activity
-      const recentActivity = await UsageStat.findAll({
-        where: { user_id: id },
-        order: [['created_at', 'DESC']],
-        limit: 10
-      });
-
-      res.json({
-        user: user.toJSON(),
-        dataStats: {
-          contacts: contactsCount,
-          credentials: credentialsCount,
-          goals: goalsCount,
-          schedules: schedulesCount,
-          numericalInfo: numericalInfoCount,
-          albums: albumsCount,
-          totalStorage: totalStorage || 0
-        },
-        recentActivity
-      });
+      res.json(userDetails);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   }
 
+  // 나머지 메서드들은 동일하게 유지
   async updateUserRole(req, res) {
     try {
       const { id } = req.params;

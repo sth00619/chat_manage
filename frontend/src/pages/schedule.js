@@ -6,14 +6,7 @@ import { format, parseISO } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import Head from 'next/head';
 import ScheduleModal from '@/components/Schedule/ScheduleModal';
-import { 
-  PlusIcon, 
-  ClockIcon, 
-  MapPinIcon, 
-  TrashIcon, 
-  PencilIcon,
-  CalendarIcon 
-} from '@heroicons/react/24/outline';
+import { PlusIcon, ClockIcon, MapPinIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 import 'react-calendar/dist/Calendar.css';
 
 export default function Schedule() {

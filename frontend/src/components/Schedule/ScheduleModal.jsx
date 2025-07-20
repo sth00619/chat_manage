@@ -4,6 +4,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { dataService } from '@/services/api';
 import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
 
 const ScheduleModal = ({ isOpen, onClose, schedule, selectedDate }) => {
   const queryClient = useQueryClient();
@@ -65,16 +66,20 @@ const ScheduleModal = ({ isOpen, onClose, schedule, selectedDate }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    const start_time = new Date(`${formData.start_date}T${formData.start_time}`);
-    const end_time = new Date(`${formData.end_date}T${formData.end_time}`);
+    // 한국 시간을 기준으로 Date 객체 생성
+    const startDateTime = new Date(`${formData.start_date}T${formData.start_time}:00`);
+    const endDateTime = new Date(`${formData.end_date}T${formData.end_time}:00`);
     
+    // 로컬 시간을 그대로 사용 (timezone offset 포함)
     const scheduleData = {
       title: formData.title,
       description: formData.description,
-      start_time: start_time.toISOString(),
-      end_time: end_time.toISOString(),
+      start_time: startDateTime.toISOString(),
+      end_time: endDateTime.toISOString(),
       location: formData.location,
     };
+
+    console.log('Sending schedule data:', scheduleData);
 
     if (schedule) {
       updateMutation.mutate({ id: schedule.id, data: scheduleData });

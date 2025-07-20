@@ -1,4 +1,4 @@
-import { useState, Fragment } from 'react';
+import { useState, Fragment, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Dialog, Transition } from '@headlessui/react';
@@ -27,12 +27,29 @@ const navigation = [
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const { user, logout, checkAuth } = useAuthStore();
+
+  // 컴포넌트 마운트 시 인증 상태 확인
+  useEffect(() => {
+    // 사용자 정보가 없으면 다시 확인
+    if (!user) {
+      checkAuth();
+    }
+  }, []);
 
   const handleLogout = () => {
     logout();
     router.push('/login');
   };
+
+  // 사용자 정보 로딩 중이면 로딩 표시
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="spinner"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex overflow-hidden bg-gray-100">

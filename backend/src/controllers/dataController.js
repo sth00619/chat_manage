@@ -6,14 +6,27 @@ const NumericalInfo = require('../models/NumericalInfo');
 const Album = require('../models/Album');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs'); // fs 모듈 추가
 const { Op } = require('sequelize');
+
+// 업로드 경로를 src 밖으로 설정
+const uploadsDir = path.join(__dirname, '../../uploads'); // backend/uploads
+
+// uploads 폴더가 없으면 생성
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log('Created uploads directory at:', uploadsDir);
+}
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    console.log('Upload destination:', uploadsDir);
+    cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
+    const filename = Date.now() + path.extname(file.originalname);
+    console.log('Generated filename:', filename);
+    cb(null, filename);
   }
 });
 
@@ -34,6 +47,7 @@ const upload = multer({
 });
 
 class DataController {
+  // Contact methods
   async getContacts(req, res) {
     try {
       const contacts = await Contact.findAll({
@@ -93,6 +107,7 @@ class DataController {
     }
   }
 
+  // Credential methods
   async getCredentials(req, res) {
     try {
       const credentials = await Credential.findAll({
@@ -152,6 +167,7 @@ class DataController {
     }
   }
 
+  // Goal methods
   async getGoals(req, res) {
     try {
       const goals = await Goal.findAll({
@@ -211,6 +227,7 @@ class DataController {
     }
   }
 
+  // Schedule methods
   async getSchedules(req, res) {
     try {
       const { start, end } = req.query;
@@ -218,7 +235,7 @@ class DataController {
       
       if (start && end) {
         where.start_time = {
-          [Op.between]: [new Date(start), new Date(end)]
+          [Op.between]: [start, end]
         };
       }
 
@@ -226,6 +243,7 @@ class DataController {
         where,
         order: [['start_time', 'ASC']]
       });
+      
       res.json(schedules);
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -234,10 +252,14 @@ class DataController {
 
   async createSchedule(req, res) {
     try {
-      const schedule = await Schedule.create({
+      const scheduleData = {
         ...req.body,
-        user_id: req.user.id
-      });
+        user_id: req.user.id,
+        start_time: req.body.start_time,
+        end_time: req.body.end_time
+      };
+
+      const schedule = await Schedule.create(scheduleData);
       res.json(schedule);
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -279,6 +301,7 @@ class DataController {
     }
   }
 
+  // Numerical Info methods
   async getNumericalInfo(req, res) {
     try {
       const info = await NumericalInfo.findAll({
@@ -338,6 +361,7 @@ class DataController {
     }
   }
 
+  // Album methods
   async getAlbums(req, res) {
     try {
       const albums = await Album.findAll({
@@ -352,11 +376,21 @@ class DataController {
 
   async uploadImage(req, res) {
     try {
+      console.log('=== Upload Debug ===');
+      console.log('File:', req.file);
+      console.log('User:', req.user?.id);
+      
       if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
       }
 
       const file = req.file;
+      
+      // 파일이 실제로 저장되었는지 확인
+      const filePath = path.join(uploadsDir, file.filename);
+      console.log('File path:', filePath);
+      console.log('File exists:', fs.existsSync(filePath));
+
       const album = await Album.create({
         user_id: req.user.id,
         filename: file.filename,
@@ -365,8 +399,11 @@ class DataController {
         size: file.size,
         url: `/uploads/${file.filename}`
       });
+
+      console.log('Album created:', album.toJSON());
       res.json(album);
     } catch (error) {
+      console.error('Upload error:', error);
       res.status(500).json({ error: error.message });
     }
   }
@@ -383,8 +420,7 @@ class DataController {
       }
       
       // Delete file from filesystem
-      const fs = require('fs');
-      const filePath = path.join(__dirname, '../../uploads', album.filename);
+      const filePath = path.join(uploadsDir, album.filename);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }

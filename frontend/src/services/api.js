@@ -4,25 +4,50 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_URL,
+  timeout: 10000, // 10초 타임아웃
 });
 
-// Request interceptor to add token
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// 토큰 가져오기 헬퍼 함수
+const getToken = () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('token');
   }
-  return config;
-});
+  return null;
+};
+
+// Request interceptor to add token
+api.interceptors.request.use(
+  (config) => {
+    const token = getToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 // Response interceptor to handle errors
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+  async (error) => {
+    const originalRequest = error.config;
+
+    // 401 에러이고 아직 재시도하지 않은 경우
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      // 로그인 페이지로 리다이렉트 (단, 로그인 API 호출이 아닌 경우)
+      if (!originalRequest.url.includes('/auth/login')) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('token');
+          window.location.href = '/login';
+        }
+      }
     }
+
     return Promise.reject(error);
   }
 );
@@ -82,8 +107,35 @@ export const dataService = {
 // Admin services
 export const adminService = {
   getDashboardStats: () => api.get('/admin/dashboard'),
-  getUsers: (params) => api.get('/admin/users', { params }),
-  getUserDetails: (id) => api.get(`/admin/users/${id}`),
+  
+  // getUsers를 axios를 사용하도록 수정
+  getUsers: async ({ page, limit, search }) => {
+    try {
+      // axios는 params 객체를 자동으로 쿼리 스트링으로 변환
+      const params = {};
+      if (page) params.page = page;
+      if (limit) params.limit = limit;
+      if (search) params.currentSearchTerm = search; // 백엔드가 currentSearchTerm으로 받음
+      
+      console.log('API: Getting users with params:', params);
+      
+      const response = await api.get('/admin/users', { params });
+      console.log('API: Users response:', response.data);
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      throw error;
+    }
+  },
+  
+  getUserDetails: async (id) => {
+    console.log('API: Getting user details for ID:', id);
+    const response = await api.get(`/admin/users/${id}`);
+    console.log('API: User details response:', response.data);
+    return response.data;
+  },
+  
   updateUserRole: (id, data) => api.put(`/admin/users/${id}/role`, data),
   deleteUser: (id) => api.delete(`/admin/users/${id}`),
   getSystemHealth: () => api.get('/admin/health'),

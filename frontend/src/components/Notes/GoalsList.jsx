@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { dataService } from '@/services/api';
-import { PlusIcon, CheckCircleIcon, ClockIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import { 
+  PlusIcon, 
+  CheckCircleIcon, 
+  ClockIcon, 
+  XCircleIcon,
+  PencilIcon,
+  TrashIcon 
+} from '@heroicons/react/24/outline';
 import GoalModal from './GoalModal';
 import { format, parseISO } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -53,6 +60,17 @@ const GoalsList = () => {
     pending: { icon: ClockIcon, color: 'text-yellow-600 bg-yellow-50', label: '대기중' },
     in_progress: { icon: ClockIcon, color: 'text-blue-600 bg-blue-50', label: '진행중' },
     completed: { icon: CheckCircleIcon, color: 'text-green-600 bg-green-50', label: '완료' },
+  };
+
+  // 날짜 포맷팅 헬퍼 함수
+  const formatDate = (dateString) => {
+    if (!dateString) return null;
+    try {
+      return format(parseISO(dateString), 'yyyy년 MM월 dd일', { locale: ko });
+    } catch (error) {
+      console.error('Date parsing error:', error);
+      return null;
+    }
   };
 
   if (isLoading) {
@@ -131,6 +149,7 @@ const GoalsList = () => {
           {filteredGoals.map((goal) => {
             const config = statusConfig[goal.status];
             const StatusIcon = config.icon;
+            const formattedDate = formatDate(goal.target_date);
             
             return (
               <div key={goal.id} className="bg-white border border-gray-200 rounded-lg p-4">
@@ -146,9 +165,9 @@ const GoalsList = () => {
                     {goal.description && (
                       <p className="mt-2 text-sm text-gray-600">{goal.description}</p>
                     )}
-                    {goal.target_date && (
+                    {formattedDate && (
                       <p className="mt-2 text-sm text-gray-500">
-                        목표일: {format(parseISO(goal.target_date), 'yyyy년 MM월 dd일', { locale: ko })}
+                        목표일: {formattedDate}
                       </p>
                     )}
                   </div>

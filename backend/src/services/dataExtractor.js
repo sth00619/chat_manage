@@ -4,6 +4,7 @@ const Goal = require('../models/Goal');
 const Schedule = require('../models/Schedule');
 const NumericalInfo = require('../models/NumericalInfo');
 const sequelize = require('../config/database');
+const { Op } = require('sequelize'); // Op import 추가
 
 class DataExtractor {
   async saveExtractedData(userId, extractedData) {
@@ -25,7 +26,7 @@ class DataExtractor {
           const existingContact = await Contact.findOne({
             where: {
               user_id: userId,
-              [sequelize.Op.or]: [
+              [Op.or]: [ // sequelize.Op.or -> Op.or로 변경
                 { email: contact.email || null },
                 { phone: contact.phone || null }
               ]
@@ -100,40 +101,98 @@ class DataExtractor {
       // Save schedules
       if (extractedData.schedules && extractedData.schedules.length > 0) {
         for (const schedule of extractedData.schedules) {
-          // Parse dates
-          const startTime = new Date(schedule.start_time);
-          const endTime = schedule.end_time ? new Date(schedule.end_time) : null;
+          let startTime = null;
+          let endTime = null;
 
-          // Check for schedule conflicts
-          const conflictingSchedule = await Schedule.findOne({
-            where: {
+          // Helper function to parse Korean date format
+          const parseKoreanDate = (dateStr) => {
+            if (!dateStr) return null;
+            
+            // Handle "7월 26일" format
+            const koreanDateMatch = dateStr.match(/(\d{1,2})월\s*(\d{1,2})일/);
+            if (koreanDateMatch) {
+              const currentYear = new Date().getFullYear();
+              const month = parseInt(koreanDateMatch[1]) - 1; // JavaScript months are 0-indexed
+              const day = parseInt(koreanDateMatch[2]);
+              return new Date(currentYear, month, day, 0, 0, 0);
+            }
+            
+            // Try standard date parsing
+            const date = new Date(dateStr);
+            return isNaN(date.getTime()) ? null : date;
+          };
+
+          // Parse start_time if exists and is valid
+          if (schedule.start_time && schedule.start_time !== 'null' && schedule.start_time !== '') {
+            startTime = parseKoreanDate(schedule.start_time);
+            
+            if (!startTime) {
+              console.warn(`Invalid start_time for schedule:`, schedule.title, schedule.start_time);
+            }
+          }
+
+          // Parse end_time if exists and is valid
+          if (schedule.end_time && schedule.end_time !== 'null' && schedule.end_time !== '') {
+            endTime = parseKoreanDate(schedule.end_time);
+            
+            if (!endTime) {
+              console.warn(`Invalid end_time for schedule:`, schedule.title, schedule.end_time);
+            }
+          }
+
+          // If we have a start_time but no end_time, set end_time to end of same day
+          if (startTime && !endTime) {
+            endTime = new Date(startTime);
+            endTime.setHours(23, 59, 59, 999);
+          }
+
+          // Check for schedule conflicts only if we have start_time
+          if (startTime) {
+            const whereClause = {
               user_id: userId,
-              [sequelize.Op.or]: [
+              start_time: { [Op.not]: null }
+            };
+
+            if (endTime) {
+              whereClause[Op.or] = [
                 {
                   start_time: {
-                    [sequelize.Op.between]: [startTime, endTime || startTime]
+                    [Op.between]: [startTime, endTime]
                   }
                 },
                 {
                   end_time: {
-                    [sequelize.Op.between]: [startTime, endTime || startTime]
+                    [Op.between]: [startTime, endTime]
                   }
                 }
-              ]
-            },
-            transaction
-          });
+              ];
+            } else {
+              whereClause.start_time = startTime;
+            }
 
-          if (conflictingSchedule) {
-            console.warn(`Schedule conflict detected for user ${userId}:`, schedule.title);
+            const conflictingSchedule = await Schedule.findOne({
+              where: whereClause,
+              transaction
+            });
+
+            if (conflictingSchedule) {
+              console.warn(`Schedule conflict detected for user ${userId}:`, schedule.title);
+            }
           }
 
-          const saved = await Schedule.create({
+          // Create schedule data with explicit fields
+          const scheduleData = {
             user_id: userId,
-            ...schedule,
+            title: schedule.title || null,
+            description: schedule.description || null,
             start_time: startTime,
-            end_time: endTime
-          }, { transaction });
+            end_time: endTime,
+            location: schedule.location || null,
+            created_at: new Date(),
+            updated_at: null
+          };
+
+          const saved = await Schedule.create(scheduleData, { transaction });
           results.schedules.push(saved);
         }
       }

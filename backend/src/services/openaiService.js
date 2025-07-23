@@ -7,21 +7,33 @@ const openai = new OpenAI({
 class OpenAIService {
   async getChatResponse(message, userId) {
     try {
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth() + 1;
+      const currentDay = currentDate.getDate();
+      
+      // 디버깅을 위한 로그
+      console.log('Received message:', message);
+      
       const completion = await openai.chat.completions.create({
         model: "gpt-4",
         messages: [
           {
             role: "system",
-            content: `You are a helpful personal assistant. Extract and identify personal information from user messages including contacts, credentials, goals, schedules, and numerical data.
-            
-            When extracting information, be precise and structured:
-            - For contacts: Extract name, phone, email, and address separately
-            - For credentials: Extract website/service name, username, and password
-            - For goals: Extract title, description, and target date
-            - For schedules: Extract title, description, start time, end time, and location
-            - For numerical info: Categorize appropriately (banking, health, etc.) and include label, value, and unit
-            
-            Always respond in the same language as the user's message.`
+            content: `You are a helpful AI assistant. You must ALWAYS provide a response in Korean or English based on the user's language.
+
+For general questions (programming, science, history, etc.), provide detailed, helpful answers.
+For personal data (contacts, schedules, goals), extract the information AND provide a confirmation message.
+
+Examples:
+- "파이썬 라이브러리 알려줘" → Answer: "파이썬에서 자주 사용되는 라이브러리는..."
+- "내일 회의 있어" → Extract schedule AND respond: "내일 회의 일정을 저장했습니다."
+
+Current date: ${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}
+
+When extracting dates:
+- Convert "7월 26일" to "${currentYear}-07-26 00:00:00"
+- Convert relative dates like "내일" based on current date`
           },
           {
             role: "user",
@@ -31,7 +43,7 @@ class OpenAIService {
         functions: [
           {
             name: "extract_personal_info",
-            description: "Extract personal information from the message",
+            description: "Extract personal information ONLY when user provides data to save",
             parameters: {
               type: "object",
               properties: {
@@ -106,6 +118,9 @@ class OpenAIService {
         max_tokens: 1000
       });
 
+      // 디버깅을 위한 로그
+      console.log('OpenAI response:', JSON.stringify(completion.choices[0].message, null, 2));
+
       const response = completion.choices[0].message;
       
       // Parse function call if exists
@@ -114,15 +129,57 @@ class OpenAIService {
         try {
           extractedData = JSON.parse(response.function_call.arguments);
           
+          // Post-process dates to ensure correct format
+          extractedData = this.postProcessDates(extractedData);
+          
           // Validate and clean extracted data
           extractedData = this.validateExtractedData(extractedData);
+          
+          console.log('Extracted data:', extractedData);
         } catch (parseError) {
           console.error('Error parsing function call:', parseError);
         }
       }
 
+      // 응답 메시지 처리
+      let responseMessage = response.content || '';
+      
+      // content가 비어있고 function_call만 있는 경우
+      if (!responseMessage && extractedData) {
+        responseMessage = this.generateResponseMessage(extractedData);
+      }
+      
+      // 그래도 메시지가 없으면
+      if (!responseMessage) {
+        // 일반 질문인 경우 다시 시도
+        if (!extractedData) {
+          console.log('No response content, retrying without functions...');
+          
+          const simpleCompletion = await openai.chat.completions.create({
+            model: "gpt-4",
+            messages: [
+              {
+                role: "system",
+                content: "You are a helpful AI assistant. Answer the user's question in their language."
+              },
+              {
+                role: "user",
+                content: message
+              }
+            ],
+            temperature: 0.7,
+            max_tokens: 1000
+          });
+          
+          responseMessage = simpleCompletion.choices[0].message.content || 
+            "죄송합니다. 응답을 생성할 수 없습니다.";
+        } else {
+          responseMessage = "정보를 처리했습니다.";
+        }
+      }
+
       return {
-        message: response.content || this.generateResponseMessage(extractedData),
+        message: responseMessage,
         extractedData
       };
     } catch (error) {
@@ -137,6 +194,34 @@ class OpenAIService {
       
       throw error;
     }
+  }
+
+  postProcessDates(data) {
+    if (!data) return data;
+    
+    // Process schedules
+    if (data.schedules && Array.isArray(data.schedules)) {
+      data.schedules = data.schedules.map(schedule => {
+        // Ensure datetime format
+        if (schedule.start_time) {
+          // If it's just a date without time, add 00:00:00
+          if (schedule.start_time.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            schedule.start_time = `${schedule.start_time} 00:00:00`;
+          }
+        }
+        
+        if (schedule.end_time) {
+          // If it's just a date without time, add 23:59:59
+          if (schedule.end_time.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            schedule.end_time = `${schedule.end_time} 23:59:59`;
+          }
+        }
+        
+        return schedule;
+      });
+    }
+    
+    return data;
   }
 
   validateExtractedData(data) {

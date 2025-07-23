@@ -93,13 +93,18 @@ app.use((err, req, res, next) => {
 // Database sync and server start
 const PORT = process.env.PORT || 5000;
 
-sequelize.sync({ alter: true }).then(() => {
+// sync 옵션 변경: alter: true 제거
+sequelize.sync().then(() => {
+  console.log('Database connected successfully');
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
     console.log(`Uploads served at: http://localhost:${PORT}/uploads/`);
   });
 }).catch(err => {
   console.error('Unable to connect to the database:', err);
+  // 데이터베이스 연결 실패해도 서버는 시작하도록 함
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT} (without database)`);
+    console.log(`Uploads served at: http://localhost:${PORT}/uploads/`);
+  });
 });
-
-module.exports = app;

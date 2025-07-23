@@ -4,7 +4,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 10000, // 10초 타임아웃
+  timeout: 30000, // 30초로 증가 (기본값)
 });
 
 // 토큰 가져오기 헬퍼 함수
@@ -59,9 +59,11 @@ export const authService = {
   getProfile: () => api.get('/auth/profile'),
 };
 
-// Chat services
+// Chat services - 채팅은 더 긴 타임아웃 필요
 export const chatService = {
-  sendMessage: (message) => api.post('/chat/message', { message }),
+  sendMessage: (message) => api.post('/chat/message', { message }, {
+    timeout: 60000 // 채팅은 60초 타임아웃
+  }),
 };
 
 // Data services

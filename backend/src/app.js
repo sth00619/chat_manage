@@ -72,11 +72,21 @@ if (process.env.NODE_ENV === 'development') {
   app.use('/api/', limiter);
 }
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/data', require('./routes/data'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/payment', require('./routes/payment'));
 
 // 404 핸들러
 app.use('/uploads', (req, res) => {

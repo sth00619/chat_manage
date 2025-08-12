@@ -14,6 +14,8 @@ import {
   Bars3Icon,
   XMarkIcon,
   UserCircleIcon,
+  SunIcon,
+  MoonIcon,
 } from '@heroicons/react/24/outline';
 
 const navigation = [
@@ -26,6 +28,7 @@ const navigation = [
 
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
   const router = useRouter();
   const { user, logout, checkAuth } = useAuthStore();
 
@@ -35,7 +38,25 @@ const Layout = ({ children }) => {
     if (!user) {
       checkAuth();
     }
+    
+    // 다크모드 설정 불러오기
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      setDarkMode(true);
+      document.documentElement.classList.add('dark');
+    }
   }, []);
+
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode);
+    if (!darkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -161,8 +182,19 @@ const Layout = ({ children }) => {
         <div className="flex flex-col w-64">
           <div className="flex-1 flex flex-col min-h-0 border-r border-gray-200 bg-white">
             <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
-              <div className="flex items-center flex-shrink-0 px-4">
+              <div className="flex items-center justify-between flex-shrink-0 px-4">
                 <h1 className="text-xl font-bold text-gray-900">Personal Assistant</h1>
+                <button
+                  onClick={toggleDarkMode}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  aria-label="Toggle dark mode"
+                >
+                  {darkMode ? (
+                    <SunIcon className="h-5 w-5 text-yellow-500" />
+                  ) : (
+                    <MoonIcon className="h-5 w-5 text-gray-600" />
+                  )}
+                </button>
               </div>
               <nav className="mt-5 flex-1 px-2 bg-white space-y-1">
                 {navigation.map((item) => (
@@ -216,7 +248,7 @@ const Layout = ({ children }) => {
       </div>
 
       <div className="flex flex-col w-0 flex-1 overflow-hidden">
-        <div className="md:hidden pl-1 pt-1 sm:pl-3 sm:pt-3">
+        <div className="md:hidden pl-1 pt-1 sm:pl-3 sm:pt-3 flex items-center justify-between pr-3">
           <button
             type="button"
             className="h-12 w-12 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
@@ -224,6 +256,17 @@ const Layout = ({ children }) => {
           >
             <span className="sr-only">Open sidebar</span>
             <Bars3Icon className="h-6 w-6" />
+          </button>
+          <button
+            onClick={toggleDarkMode}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            aria-label="Toggle dark mode"
+          >
+            {darkMode ? (
+              <SunIcon className="h-5 w-5 text-yellow-500" />
+            ) : (
+              <MoonIcon className="h-5 w-5 text-gray-600" />
+            )}
           </button>
         </div>
         <main className="flex-1 relative z-0 overflow-y-auto focus:outline-none">

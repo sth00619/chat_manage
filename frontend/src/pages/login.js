@@ -28,7 +28,16 @@ export default function Login() {
   };
 
   const handleOAuth = (provider) => {
-    window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/${provider}`;
+    // For development - OAuth won't work with localhost URLs
+    if (process.env.NODE_ENV === 'development') {
+      alert(`${provider} 로그인은 실제 도메인이 필요합니다.\n개발 환경에서는 이메일 로그인을 사용해주세요.`);
+      return;
+    }
+    
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+    const oauthUrl = `${apiUrl}/auth/${provider}`;
+    console.log('OAuth URL:', oauthUrl);
+    window.location.href = oauthUrl;
   };
 
   return (

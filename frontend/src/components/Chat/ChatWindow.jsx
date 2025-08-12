@@ -3,12 +3,14 @@ import { useMutation } from '@tanstack/react-query';
 import { chatService } from '@/services/api';
 import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
 import { CheckCircleIcon } from '@heroicons/react/24/outline';
+import { useNotification } from '@/components/Notification/NotificationProvider';
 
 const ChatWindow = () => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const notification = useNotification();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -29,6 +31,19 @@ const ChatWindow = () => {
       };
       setMessages(prev => [...prev, aiMessage]);
       setMessage('');
+      
+      // Show notification if data was extracted
+      if (response.data.extractedData) {
+        const items = [];
+        const data = response.data.extractedData;
+        if (data.schedules?.length) items.push(`${data.schedules.length}개의 일정`);
+        if (data.contacts?.length) items.push(`${data.contacts.length}개의 연락처`);
+        if (data.goals?.length) items.push(`${data.goals.length}개의 목표`);
+        
+        if (items.length > 0) {
+          notification.success(`${items.join(', ')}이(가) 저장되었습니다`);
+        }
+      }
     },
     onError: (error) => {
       const errorMessage = {
@@ -37,6 +52,7 @@ const ChatWindow = () => {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorMessage]);
+      notification.error('메시지 전송에 실패했습니다');
     },
   });
 

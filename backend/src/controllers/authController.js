@@ -66,14 +66,23 @@ class AuthController {
   }
 
   async oauthCallback(req, res) {
-    const user = req.user;
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    try {
+      const user = req.user;
+      if (!user) {
+        return res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_failed`);
+      }
+      
+      const token = jwt.sign(
+        { id: user.id, email: user.email },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
 
-    res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${token}`);
+      res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${token}`);
+    } catch (error) {
+      console.error('OAuth callback error:', error);
+      res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_error`);
+    }
   }
 
   async getProfile(req, res) {

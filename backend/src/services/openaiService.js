@@ -1,12 +1,51 @@
 const OpenAI = require('openai');
+const Subscription = require('../models/Subscription');
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 class OpenAIService {
+  async checkSubscriptionLimit(userId) {
+    const subscription = await Subscription.findOne({
+      where: { user_id: userId, status: 'active' }
+    });
+
+    if (!subscription) {
+      const defaultLimit = 10;
+      return { canUse: true, remaining: defaultLimit };
+    }
+
+    if (subscription.ai_requests_limit === -1) {
+      return { canUse: true, remaining: 'unlimited' };
+    }
+
+    const remaining = subscription.ai_requests_limit - subscription.ai_requests_used;
+    if (remaining <= 0) {
+      return { canUse: false, remaining: 0 };
+    }
+
+    return { canUse: true, remaining, subscription };
+  }
+
+  async incrementUsage(userId) {
+    const subscription = await Subscription.findOne({
+      where: { user_id: userId, status: 'active' }
+    });
+
+    if (subscription && subscription.ai_requests_limit !== -1) {
+      subscription.ai_requests_used += 1;
+      await subscription.save();
+    }
+  }
+
   async getChatResponse(message, userId) {
     try {
+      const { canUse, remaining } = await this.checkSubscriptionLimit(userId);
+      
+      if (!canUse) {
+        throw new Error('AI 요청 한도를 초과했습니다. 플랜을 업그레이드해주세요.');
+      }
       const currentDate = new Date();
       const currentYear = currentDate.getFullYear();
       const currentMonth = currentDate.getMonth() + 1;
@@ -177,6 +216,8 @@ When extracting dates:
           responseMessage = "정보를 처리했습니다.";
         }
       }
+
+      await this.incrementUsage(userId);
 
       return {
         message: responseMessage,

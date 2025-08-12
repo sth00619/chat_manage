@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import useAuthStore from '@/store/useAuthStore';
 import Layout from '@/components/Layout/Layout';
+import { NotificationProvider } from '@/components/Notification/NotificationProvider';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -78,13 +79,15 @@ export default function App({ Component, pageProps }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {isPublicRoute ? (
-        <Component {...pageProps} />
-      ) : (
-        <Layout>
+      <NotificationProvider>
+        {isPublicRoute ? (
           <Component {...pageProps} />
-        </Layout>
-      )}
+        ) : (
+          <Layout>
+            <Component {...pageProps} />
+          </Layout>
+        )}
+      </NotificationProvider>
     </QueryClientProvider>
   );
 }

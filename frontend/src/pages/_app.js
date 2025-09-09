@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import useAuthStore from '@/store/useAuthStore';
 import Layout from '@/components/Layout/Layout';
 import { NotificationProvider } from '@/components/Notification/NotificationProvider';
+import { LanguageProvider } from '@/contexts/LanguageContext';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,11 +21,12 @@ const queryClient = new QueryClient({
 const publicRoutes = ['/login', '/register', '/auth/callback'];
 
 function LoadingScreen() {
+  const language = typeof window !== 'undefined' ? localStorage.getItem('language') || 'ko' : 'ko';
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center">
         <div className="spinner mx-auto mb-4"></div>
-        <p className="text-gray-600">로딩 중...</p>
+        <p className="text-gray-600">{language === 'ko' ? '로딩 중...' : 'Loading...'}</p>
       </div>
     </div>
   );
@@ -78,16 +81,20 @@ export default function App({ Component, pageProps }) {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <NotificationProvider>
-        {isPublicRoute ? (
-          <Component {...pageProps} />
-        ) : (
-          <Layout>
-            <Component {...pageProps} />
-          </Layout>
-        )}
-      </NotificationProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <LanguageProvider>
+          <NotificationProvider>
+            {isPublicRoute ? (
+              <Component {...pageProps} />
+            ) : (
+              <Layout>
+                <Component {...pageProps} />
+              </Layout>
+            )}
+          </NotificationProvider>
+        </LanguageProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

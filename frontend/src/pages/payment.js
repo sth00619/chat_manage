@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout/Layout';
 import { useRouter } from 'next/router';
-import axios from 'axios';
+import api from '@/services/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function Payment() {
   const [selectedPlan, setSelectedPlan] = useState('basic');
@@ -9,47 +10,30 @@ export default function Payment() {
   const [subscription, setSubscription] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('card');
   const router = useRouter();
+  const { t, language } = useLanguage();
 
   const plans = [
     {
       id: 'free',
-      name: 'Free Plan',
-      price: '₩0',
-      period: '월',
-      features: [
-        '월 10회 AI 채팅',
-        '기본 일정 관리',
-        '5GB 저장공간',
-        '기본 지원'
-      ]
+      name: t('payment.plans.free.name'),
+      price: language === 'ko' ? '₩0' : language === 'zh' ? '¥0' : '$0',
+      period: t('payment.month'),
+      features: t('payment.plans.free.features')
     },
     {
       id: 'basic',
-      name: 'Basic Plan',
-      price: '₩9,900',
-      period: '월',
-      features: [
-        '월 100회 AI 채팅',
-        '고급 일정 관리',
-        '50GB 저장공간',
-        '이메일 지원',
-        '캘린더 통합'
-      ],
+      name: t('payment.plans.basic.name'),
+      price: language === 'ko' ? '₩9,900' : language === 'zh' ? '¥69' : '$9.99',
+      period: t('payment.month'),
+      features: t('payment.plans.basic.features'),
       popular: true
     },
     {
       id: 'premium',
-      name: 'Premium Plan',
-      price: '₩19,900',
-      period: '월',
-      features: [
-        '무제한 AI 채팅',
-        '모든 기능 이용',
-        '무제한 저장공간',
-        '24/7 지원',
-        'API 접근',
-        '커스텀 AI 모델'
-      ]
+      name: t('payment.plans.premium.name'),
+      price: language === 'ko' ? '₩19,900' : language === 'zh' ? '¥139' : '$19.99',
+      period: t('payment.month'),
+      features: t('payment.plans.premium.features')
     }
   ];
 
@@ -60,8 +44,8 @@ export default function Payment() {
   const fetchSubscriptionStatus = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/payment/subscription', {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await api.get('/payment/subscription', {
+        
       });
       setSubscription(response.data);
     } catch (error) {
@@ -71,26 +55,26 @@ export default function Payment() {
 
   const handlePayment = async (planId) => {
     if (planId === 'free') {
-      alert('무료 플랜은 별도의 결제가 필요하지 않습니다.');
+      alert(t('payment.freePlanAlert'));
       return;
     }
 
     setIsLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post(
-        'http://localhost:5000/api/payment/create',
+      const response = await api.post(
+        '/payment/create',
         {
           plan_type: planId,
           payment_method: paymentMethod
         },
         {
-          headers: { Authorization: `Bearer ${token}` }
+          
         }
       );
 
       if (response.data.success) {
-        alert(`${planId} 플랜 결제 준비가 완료되었습니다.\n결제 게이트웨이 연동이 필요합니다.`);
+        alert(`${planId} ${t('payment.paymentReady')}`);
         
         // 실제 구현 시:
         // if (paymentMethod === 'kakao_pay') {
@@ -101,7 +85,7 @@ export default function Payment() {
       }
     } catch (error) {
       console.error('Payment error:', error);
-      alert('결제 처리 중 오류가 발생했습니다.');
+      alert(t('payment.paymentError'));
     } finally {
       setIsLoading(false);
     }
@@ -112,39 +96,39 @@ export default function Payment() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center">
           <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-            요금제 선택
+            {t('payment.title')}
           </h2>
           <p className="mt-4 text-xl text-gray-600">
-            당신에게 맞는 플랜을 선택하세요
+            {t('payment.subtitle')}
           </p>
         </div>
 
         {subscription && subscription.has_subscription && (
           <div className="mb-8 p-4 bg-blue-50 rounded-lg">
-            <h3 className="text-lg font-semibold text-blue-900">현재 구독 상태</h3>
+            <h3 className="text-lg font-semibold text-blue-900">{t('payment.currentSubscription')}</h3>
             <p className="text-blue-700">
-              플랜: {subscription.subscription?.plan_type?.toUpperCase()}
+              {t('payment.plan')}: {subscription.subscription?.plan_type?.toUpperCase()}
             </p>
             <p className="text-blue-700">
-              AI 요청 남은 횟수: {subscription.ai_requests_remaining === 'unlimited' ? '무제한' : subscription.ai_requests_remaining}
+              {t('payment.aiRequestsRemaining')}: {subscription.ai_requests_remaining === 'unlimited' ? t('payment.unlimited') : subscription.ai_requests_remaining}
             </p>
           </div>
         )}
 
         <div className="mb-8">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            결제 방법 선택
+            {t('payment.selectPaymentMethod')}
           </label>
           <select
             value={paymentMethod}
             onChange={(e) => setPaymentMethod(e.target.value)}
             className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="card">신용/체크카드</option>
-            <option value="kakao_pay">카카오페이</option>
-            <option value="naver_pay">네이버페이</option>
-            <option value="toss">토스</option>
-            <option value="bank_transfer">계좌이체</option>
+            <option value="card">{t('payment.paymentMethods.card')}</option>
+            <option value="kakao_pay">{t('payment.paymentMethods.kakaoPay')}</option>
+            <option value="naver_pay">{t('payment.paymentMethods.naverPay')}</option>
+            <option value="toss">{t('payment.paymentMethods.toss')}</option>
+            <option value="bank_transfer">{t('payment.paymentMethods.bankTransfer')}</option>
           </select>
         </div>
 
@@ -161,7 +145,7 @@ export default function Payment() {
               {plan.popular && (
                 <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                   <span className="inline-flex px-4 py-1 rounded-full text-sm font-semibold tracking-wide uppercase bg-blue-500 text-white">
-                    인기
+                    {t('payment.popular')}
                   </span>
                 </div>
               )}
@@ -208,7 +192,7 @@ export default function Payment() {
                       : 'bg-blue-50 text-blue-700 hover:bg-blue-100 focus:ring-blue-500'
                   } disabled:opacity-50`}
                 >
-                  {isLoading ? '처리 중...' : plan.id === 'free' ? '무료 시작' : '선택하기'}
+                  {isLoading ? t('payment.processing') : plan.id === 'free' ? t('payment.startFree') : t('payment.selectPlan')}
                 </button>
               </div>
             </div>
@@ -217,13 +201,13 @@ export default function Payment() {
 
         <div className="mt-12 text-center">
           <p className="text-base text-gray-500">
-            모든 플랜은 언제든지 변경하거나 취소할 수 있습니다.
+            {t('payment.changeAnytime')}
           </p>
           <button
             onClick={() => router.push('/dashboard')}
             className="mt-4 text-blue-600 hover:text-blue-500 font-medium"
           >
-            ← 대시보드로 돌아가기
+            ← {t('payment.backToDashboard')}
           </button>
         </div>
       </div>

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Dialog, Transition } from '@headlessui/react';
 import useAuthStore from '@/store/useAuthStore';
+import { useLanguage } from '@/contexts/LanguageContext';
 import {
   HomeIcon,
   ChatBubbleLeftRightIcon,
@@ -16,14 +17,15 @@ import {
   UserCircleIcon,
   SunIcon,
   MoonIcon,
+  LanguageIcon,
 } from '@heroicons/react/24/outline';
 
-const navigation = [
-  { name: '대시보드', href: '/dashboard', icon: HomeIcon },
-  { name: 'AI 비서', href: '/chat', icon: ChatBubbleLeftRightIcon },
-  { name: '일정', href: '/schedule', icon: CalendarIcon },
-  { name: '노트', href: '/notes', icon: DocumentTextIcon },
-  { name: '앨범', href: '/album', icon: PhotoIcon },
+const getNavigation = (t) => [
+  { name: t('nav.dashboard'), href: '/dashboard', icon: HomeIcon },
+  { name: t('nav.aiAssistant'), href: '/chat', icon: ChatBubbleLeftRightIcon },
+  { name: t('nav.schedule'), href: '/schedule', icon: CalendarIcon },
+  { name: t('nav.notes'), href: '/notes', icon: DocumentTextIcon },
+  { name: t('nav.album'), href: '/album', icon: PhotoIcon },
 ];
 
 const Layout = ({ children }) => {
@@ -31,6 +33,8 @@ const Layout = ({ children }) => {
   const [darkMode, setDarkMode] = useState(false);
   const router = useRouter();
   const { user, logout, checkAuth } = useAuthStore();
+  const { language, changeLanguage, t } = useLanguage();
+  const navigation = getNavigation(t);
 
   // 컴포넌트 마운트 시 인증 상태 확인
   useEffect(() => {
@@ -122,7 +126,7 @@ const Layout = ({ children }) => {
                 </Transition.Child>
                 <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
                   <div className="flex-shrink-0 flex items-center px-4">
-                    <h1 className="text-xl font-bold text-gray-900">Personal Assistant</h1>
+                    <h1 className="text-xl font-bold text-gray-900">{t('common.personalAssistant')}</h1>
                   </div>
                   <nav className="mt-5 px-2 space-y-1">
                     {navigation.map((item) => (
@@ -149,7 +153,7 @@ const Layout = ({ children }) => {
                         }`}
                       >
                         <CogIcon className="mr-4 h-6 w-6" />
-                        관리자
+                        {t('nav.admin')}
                       </Link>
                     )}
                   </nav>
@@ -166,7 +170,7 @@ const Layout = ({ children }) => {
                         className="flex items-center text-sm text-gray-500 hover:text-gray-700"
                       >
                         <ArrowRightOnRectangleIcon className="mr-1 h-4 w-4" />
-                        로그아웃
+                        {t('nav.logout')}
                       </button>
                     </div>
                   </div>
@@ -183,18 +187,35 @@ const Layout = ({ children }) => {
           <div className="flex-1 flex flex-col min-h-0 border-r border-gray-200 bg-white">
             <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
               <div className="flex items-center justify-between flex-shrink-0 px-4">
-                <h1 className="text-xl font-bold text-gray-900">Personal Assistant</h1>
-                <button
-                  onClick={toggleDarkMode}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                  aria-label="Toggle dark mode"
-                >
-                  {darkMode ? (
-                    <SunIcon className="h-5 w-5 text-yellow-500" />
-                  ) : (
-                    <MoonIcon className="h-5 w-5 text-gray-600" />
-                  )}
-                </button>
+                <h1 className="text-xl font-bold text-gray-900">{t('common.personalAssistant')}</h1>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => {
+                      const langs = ['ko', 'en', 'zh'];
+                      const currentIndex = langs.indexOf(language);
+                      const nextIndex = (currentIndex + 1) % langs.length;
+                      changeLanguage(langs[nextIndex]);
+                    }}
+                    className="p-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center"
+                    aria-label="Toggle language"
+                  >
+                    <LanguageIcon className="h-5 w-5 text-gray-600 mr-1" />
+                    <span className="text-xs font-medium text-gray-600">
+                      {language === 'ko' ? 'EN' : language === 'en' ? '中' : '한'}
+                    </span>
+                  </button>
+                  <button
+                    onClick={toggleDarkMode}
+                    className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                    aria-label="Toggle dark mode"
+                  >
+                    {darkMode ? (
+                      <SunIcon className="h-5 w-5 text-yellow-500" />
+                    ) : (
+                      <MoonIcon className="h-5 w-5 text-gray-600" />
+                    )}
+                  </button>
+                </div>
               </div>
               <nav className="mt-5 flex-1 px-2 bg-white space-y-1">
                 {navigation.map((item) => (
@@ -221,7 +242,7 @@ const Layout = ({ children }) => {
                     }`}
                   >
                     <CogIcon className="mr-3 h-5 w-5" />
-                    관리자
+                    {t('nav.admin')}
                   </Link>
                 )}
               </nav>
@@ -238,7 +259,7 @@ const Layout = ({ children }) => {
                     className="flex items-center text-sm text-gray-500 hover:text-gray-700"
                   >
                     <ArrowRightOnRectangleIcon className="mr-1 h-4 w-4" />
-                    로그아웃
+                    {t('nav.logout')}
                   </button>
                 </div>
               </div>
@@ -257,17 +278,34 @@ const Layout = ({ children }) => {
             <span className="sr-only">Open sidebar</span>
             <Bars3Icon className="h-6 w-6" />
           </button>
-          <button
-            onClick={toggleDarkMode}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            aria-label="Toggle dark mode"
-          >
-            {darkMode ? (
-              <SunIcon className="h-5 w-5 text-yellow-500" />
-            ) : (
-              <MoonIcon className="h-5 w-5 text-gray-600" />
-            )}
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => {
+                const langs = ['ko', 'en', 'zh'];
+                const currentIndex = langs.indexOf(language);
+                const nextIndex = (currentIndex + 1) % langs.length;
+                changeLanguage(langs[nextIndex]);
+              }}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center"
+              aria-label="Toggle language"
+            >
+              <LanguageIcon className="h-5 w-5 text-gray-600 mr-1" />
+              <span className="text-xs font-medium text-gray-600">
+                {language === 'ko' ? 'EN' : language === 'en' ? '中' : '한'}
+              </span>
+            </button>
+            <button
+              onClick={toggleDarkMode}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              aria-label="Toggle dark mode"
+            >
+              {darkMode ? (
+                <SunIcon className="h-5 w-5 text-yellow-500" />
+              ) : (
+                <MoonIcon className="h-5 w-5 text-gray-600" />
+              )}
+            </button>
+          </div>
         </div>
         <main className="flex-1 relative z-0 overflow-y-auto focus:outline-none">
           {children}
